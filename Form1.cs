@@ -36,14 +36,15 @@ namespace WindowsFormsApp1
                     MessageBox.Show("您选择的文件路径是: " + filePath);  // 显示选择的文件路径
                     try
                     {
-                        ReadExcel(filePath);
-                        string jsonFileName = Path.GetFileNameWithoutExtension(fileName) + ".json";
-                        SaveStudentsToJson(SharedData.globalStudents, jsonFileName);
-                        MessageBox.Show("数据已成功处理并保存为JSON文件！");
+                        var students = ReadExcel(filePath);
+                        string jsonFileName = Path.GetFileNameWithoutExtension(fileName) + DateTime.Now.ToString("_yyyy-MM-dd_HHmmss") + ".json";
+                        SaveStudentsToJson(students, jsonFileName);
+                        string jsonFilePath = Path.GetFullPath(jsonFileName);
+                        MessageBox.Show($"json存放路径：{jsonFilePath}");
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"处理文件时发生错误:{ex.Message}");
+                        MessageBox.Show($"处理文件时发生错误:{ex.ToString()}");
                     }
 
                 }
@@ -52,15 +53,9 @@ namespace WindowsFormsApp1
 
 
         // ==================== 核心逻辑 ====================
-        //使ReadExcel中students变量作用域为全局
-        public static class SharedData
-        {
-            private static readonly List<StudentInfo> students = new List<StudentInfo>();
-            public static List<StudentInfo> globalStudents => students;
-        }
 
         // 从 Excel 读取数据（支持 .xls 和 .xlsx）
-        private void ReadExcel(string filePath)
+        private List<StudentInfo> ReadExcel(string filePath)
         {
             IWorkbook workbook;
             using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
@@ -76,6 +71,11 @@ namespace WindowsFormsApp1
 
             var headers = new List<string>();
 
+            if(workbook == null)
+            {
+                throw new Exception("空文件");
+            }
+
             if (headerRow == null)
             {
                 throw new Exception("Excel文件必须包含标题行，且标题行不能为空。");
@@ -83,7 +83,7 @@ namespace WindowsFormsApp1
 
             for (int i = 0; i < headerRow.LastCellNum; i++)
             {
-                headers.Add(item: headerRow.GetCell(i)?.ToString().Trim() ?? $"Column{i}");
+                headers.Add(item: headerRow.GetCell(i)?.ToString()?.Trim() ?? $"Column{i}");
             }
 
             int colClass = headers.IndexOf("班级");
@@ -92,6 +92,8 @@ namespace WindowsFormsApp1
 
             if (colClass == -1 || colName == -1 || colStudentId == -1)
                 throw new Exception("标题行必须包含“班级”、“姓名”、“学号”三列。");
+
+            var students = new List<StudentInfo>();
 
             for (int rowIdx = 1; rowIdx <= sheet.LastRowNum; rowIdx++)
             {
@@ -108,10 +110,10 @@ namespace WindowsFormsApp1
                     姓名 = row.GetCell(colName)?.ToString() ?? "",
                     学号 = row.GetCell(colStudentId)?.ToString() ?? ""
                 };
-                SharedData.globalStudents.Add(student);
+                students.Add(student);
             }
             
-            return;
+            return students;
         }
 
         // 保存为 JSON 到程序所在目录下的 JsonOutput 文件夹
